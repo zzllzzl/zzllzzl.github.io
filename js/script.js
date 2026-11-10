@@ -1,140 +1,142 @@
-(function($) {
-    // Search
-    var $searchWrap = $('#search-form-wrap'),
-        isSearchAnim = false,
-        searchAnimDuration = 200;
-    var startSearchAnim = function() {
-        isSearchAnim = true;
-    };
-    var stopSearchAnim = function(callback) {
-        setTimeout(function() {
-            isSearchAnim = false;
-            callback && callback();
-        }, searchAnimDuration);
-    };
-    $('#nav-search-btn').on('click', function() {
-        if (isSearchAnim) return;
-        startSearchAnim();
-        $searchWrap.addClass('on');
-        stopSearchAnim(function() {
-            $('.search-form-input').focus();
-        });
-    });
-    $('.search-form-input').on('blur', function() {
-        startSearchAnim();
-        $searchWrap.removeClass('on');
-        stopSearchAnim();
-    });
-    // Share
-    /*
-    $('body').on('click', function() {
-        $('.article-share-box.on').removeClass('on');
-    }).on('click', '.article-share-link', function(e) {
-        e.stopPropagation();
-        var $this = $(this),
-            url = $this.attr('data-url'),
-            encodedUrl = encodeURIComponent(url),
-            id = 'article-share-box-' + $this.attr('data-id'),
-            offset = $this.offset();
-        if ($('#' + id).length) {
-            var box = $('#' + id);
-            if (box.hasClass('on')) {
-                box.removeClass('on');
-                return;
-            }
-        } else {
-            var html = ['<div id="' + id + '" class="article-share-box">', '<input class="article-share-input" value="' + url + '">', '<div class="article-share-links">', '<a href="http://tieba.baidu.com/f/commit/share/openShareApi?url=' + encodedUrl + '" class="article-share-tieba" target="_blank" title="百度贴吧"></a>', '<a href="http://service.weibo.com/share/share.php?url=' + encodedUrl + '" class="article-share-weibo" target="_blank" title="新浪微博"></a>', '<a href="http://share.v.t.qq.com/index.php?c=share&a=index&url=' + encodedUrl + '" class="article-share-tqq" target="_blank" title="腾讯微博"></a>', '<a href="http://widget.renren.com/dialog/share?resourceUrl=' + encodedUrl + '" class="article-share-renren" target="_blank" title="人人"></a>', '</div>', '</div>'].join('');
-            var box = $(html);
-            $('body').append(box);
+window.addEventListener("DOMContentLoaded", function() {
+  const html            = document.querySelector("html");
+  const navBtn          = document.querySelector(".navbar-btn");
+  const navList         = document.querySelector(".navbar-list");
+  const backToTopFixed  = document.querySelector(".back-to-top-fixed");
+  let lastTop           = 0;
+  let lastRefreshTime   = 0;
+  let frameCount        = 0;
+  let refreshRate       = 0;
+  let theme             = window.localStorage.getItem('theme') || '';
+
+  theme && html.classList.add(theme)
+
+
+  /**
+   * 初始化刷新率估计
+   */
+  const estimateRefreshRate = () => {
+      const currentTime = performance.now();
+      if (currentTime - lastRefreshTime >= 1000) { // fps
+          refreshRate = frameCount;
+          frameCount = 0;
+          lastRefreshTime = currentTime;
+      } else {
+          frameCount++;
+      }
+      requestAnimationFrame(estimateRefreshRate);
+  }
+  
+  estimateRefreshRate();
+
+  const goScrollTop = () => {
+    let currentTop = getScrollTop()
+    let speed = Math.floor(-currentTop / (refreshRate / 6))
+    if (currentTop > lastTop + 0.5 || currentTop < lastTop - 0.5 ) {
+      // interrupt the animation
+      return lastTop = 0
+    }
+    let distance = currentTop + speed;
+    lastTop = distance;
+    document.documentElement.scrollTop = distance;
+    distance > 0 && window.requestAnimationFrame(goScrollTop)
+  }
+
+  const toggleBackToTopBtn = (top) => {
+    top = top || getScrollTop()
+    if (top >= 100) {
+      backToTopFixed.classList.add("show")
+    } else {
+      backToTopFixed.classList.remove("show")
+    }
+  }
+
+  toggleBackToTopBtn()
+
+  // theme light click
+  document.querySelector('#theme-light').addEventListener('click', function () {
+    html.classList.remove('theme-dark')
+    html.classList.add('theme-light')
+    window.localStorage.setItem('theme', 'theme-light')
+  })
+
+  // theme dark click
+  document.querySelector('#theme-dark').addEventListener('click', function () {
+    html.classList.remove('theme-light')
+    html.classList.add('theme-dark')
+    window.localStorage.setItem('theme', 'theme-dark')
+  })
+
+  // theme auto click
+  document.querySelector('#theme-auto').addEventListener('click', function() {
+    html.classList.remove('theme-light')
+    html.classList.remove('theme-dark')
+    window.localStorage.setItem('theme', '')
+  })
+
+  // mobile nav click
+  navBtn.addEventListener("click", function () {
+    html.classList.toggle("show-mobile-nav");
+    this.classList.toggle("active");
+  });
+
+  // mobile nav link click
+  navList.addEventListener("click", function (e) {
+    if (e.target.nodeName == "A" && html.classList.contains("show-mobile-nav")) {
+      navBtn.click()
+    }
+  })
+
+  // click back to top
+  backToTopFixed.addEventListener("click", function () {
+    lastTop = getScrollTop()
+    goScrollTop()
+  });
+
+  window.addEventListener("scroll", function () {
+    toggleBackToTopBtn()
+  }, { passive: true });
+
+  /** handle lazy bg iamge */
+  handleLazyBG();
+});
+
+/**
+ * 获取当前滚动条距离顶部高度
+ *
+ * @returns 距离高度
+ */
+function getScrollTop () {
+  return window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop;
+}
+
+function querySelectorArrs (selector) {
+  return Array.from(document.querySelectorAll(selector))
+}
+
+
+function handleLazyBG () {
+  const lazyBackgrounds = querySelectorArrs('[background-image-lazy]')
+  let lazyBackgroundsCount = lazyBackgrounds.length
+  if (lazyBackgroundsCount > 0) {
+    let lazyBackgroundObserver = new IntersectionObserver(function(entries, observer) {
+      entries.forEach(function({ isIntersecting, target }) {
+        if (isIntersecting) {
+          let img = target.dataset.img
+          if (img) {
+            target.style.backgroundImage = `url(${img})`
+          }
+          lazyBackgroundObserver.unobserve(target)
+          lazyBackgroundsCount --
         }
-        $('.article-share-box.on').hide();
-        box.css({
-            top: offset.top + 25,
-            left: offset.left
-        }).addClass('on');
-    }).on('click', '.article-share-box', function(e) {
-        e.stopPropagation();
-    }).on('click', '.article-share-box-input', function() {
-        $(this).select();
-    }).on('click', '.article-share-box-link', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
-    });*/
-    // Caption
-    $('.article-entry').each(function(i) {
-        $(this).find('img').each(function() {
-            if ($(this).parent().hasClass('fancybox')) return;
-            var alt = this.alt;
-            if (alt) $(this).after('<span class="caption">' + alt + '</span>');
-            $(this).wrap('<a href="' + this.src + '" title="' + alt + '" class="fancybox"></a>');
-        });
-        $(this).find('.fancybox').each(function() {
-            $(this).attr('rel', 'article' + i);
-        });
-    });
-    if ($.fancybox) {
-        $('.fancybox').fancybox();
-    }
-    // Mobile nav
-    var $container = $('#container'),
-        isMobileNavAnim = false,
-        mobileNavAnimDuration = 200;
-    var startMobileNavAnim = function() {
-        isMobileNavAnim = true;
-    };
-    var stopMobileNavAnim = function() {
-        setTimeout(function() {
-            isMobileNavAnim = false;
-        }, mobileNavAnimDuration);
-    }
-    $('#main-nav-toggle').on('click', function() {
-        if (isMobileNavAnim) return;
-        startMobileNavAnim();
-        $container.toggleClass('mobile-nav-on');
-        stopMobileNavAnim();
-    });
-    $('#wrap').on('click', function() {
-        if (isMobileNavAnim || !$container.hasClass('mobile-nav-on')) return;
-        $container.removeClass('mobile-nav-on');
-    });
-    // link
-    var $linkUl = $('#link-list');
-    var $list = $('#link-list li');
-    $linkUl.empty();
-    var count = $list.length;
-    for (var i = 0; i < count; i++) {
-        var ran = Math.floor(Math.random() * $list.length);
-        $linkUl.append($list.eq(ran));
-        $list.splice(ran, 1);
-    }
-    /**
-     * Wrap images with fancybox support.
-     */
-    var wrapImageWithFancyBox = function() {
-        $('.site-content img').not('[hidden]').not('.group-picture img, .post-gallery img').each(function() {
-            var $image = $(this);
-            var imageTitle = $image.attr('title');
-            var $imageWrapLink = $image.parent('a');
-            if ($imageWrapLink.length < 1) {
-                var imageLink = $image.attr('data-original') ? this.getAttribute('data-original') : this.getAttribute('src');
-                $imageWrapLink = $image.wrap('<a data-fancybox="group" href="' + imageLink + '"></a>').parent('a');
-            }
-            $imageWrapLink.addClass('fancybox fancybox.image');
-            $imageWrapLink.attr('rel', 'group');
-            if (imageTitle) {
-                $imageWrapLink.append('<p class="image-caption">' + imageTitle + '</p>');
-                //make sure img title tag will show correctly in fancybox
-                $imageWrapLink.attr('title', imageTitle);
-            }
-        });
-        $('.fancybox').fancybox({
-            helpers: {
-                overlay: {
-                    locked: false
-                }
-            }
-        });
-    }
-    wrapImageWithFancyBox();
-})(jQuery);
+        if (lazyBackgroundsCount <= 0) {
+          lazyBackgroundObserver.disconnect()
+        }
+      })
+    })
+
+    lazyBackgrounds.forEach(function(lazyBackground) {
+      lazyBackgroundObserver.observe(lazyBackground)
+    })
+  }
+}
